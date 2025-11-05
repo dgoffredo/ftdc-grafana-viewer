@@ -1,0 +1,52 @@
+#!/bin/sh
+
+usage() {
+    cat <<'END_USAGE'
+usage: ./extract <FTDC_symlink_directory> [<metric_name>]
+
+Parse the FTDC dump files from the specified <FTDC_symlink_directory> of
+symbolic links, and append JSON-lines to files in the current directory, where
+the names of the new files are derived from the names of the symbolic links.
+
+Extract the optionally specified <metric_name>, or extract
+"serverStatus_connections_totalCreated" if a <metric_name> is not specified.
+
+END_USAGE
+}
+
+if [ $# -lt 1 ]; then
+    >&2 usage
+    exit 1
+elif [ "$1" = '--help' ] || [ "$1" = '-h' ]; then
+    usage
+    exit 0
+fi
+
+importer=${IMPORTER:-target/release/ftdc-importer}
+ftdc_dir=$1
+metric=${2:-serverStatus_connections_totalCreated}
+
+output_for() {
+    echo "$(basename ${1%%.metrics.*}).$metric.jsonl"
+}
+
+# Clean up any existing output files.
+for input in "$ftdc_dir"/*; do
+    output=$(output_for "$input")
+    rm -f "$output"
+done
+
+# Append to the output files.
+for input in "$ftdc_dir"/*; do
+    output=$(output_for "$input")
+    "$importer" --dump --metric "$metric" "$input" >>"$output"
+done
+
+# Sort the output files by timestamp (polite, though not strictly necessary).
+scratch=$(mktemp -d)
+for input in "$ftdc_dir"/*; do
+    output=$(output_for "$input")
+    <"$output" jq -c --slurp 'sort_by(.timestamp) | .[]' >"$scratch/sorted" && mv "$scratch/sorted" "$output"
+done
+rm -r "$scratch"
+

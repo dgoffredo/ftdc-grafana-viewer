@@ -1,0 +1,25 @@
+#!/usr/bin/env python
+
+import fileinput
+import json
+import sys
+
+
+previous = None
+for line in fileinput.input(encoding="utf-8"):
+    sample = json.loads(line)
+    if previous is None:
+        previous = sample
+        continue
+
+    timestamp_ms = sample['timestamp']
+    value = sample['value']
+    previous_timestamp_ms = previous['timestamp']
+    previous_value = previous['value']
+    delta_ms = timestamp_ms - previous_timestamp_ms
+    rate_per_second = (value - previous_value) / (delta_ms / 1000)
+    json.dump({**sample, 'timestamp_unix': timestamp_ms / 1000, 'rate_per_second': rate_per_second, 'delta_ms': delta_ms}, sys.stdout)
+    sys.stdout.write('\n')
+
+    previous = sample
+
