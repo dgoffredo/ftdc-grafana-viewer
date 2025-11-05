@@ -4,6 +4,7 @@ use ftdc_importer::{
     victoria_metrics::VictoriaMetricsClient, ImportMetadata,
 };
 use std::collections::HashMap;
+use std::io::Write;
 use std::path::PathBuf;
 use std::time::Instant;
 use structopt::StructOpt;
@@ -37,6 +38,14 @@ struct Opt {
     /// Extra label to add to all metrics (format: name=value)
     #[structopt(long, number_of_values = 1, multiple = true)]
     extra_label: Vec<String>,
+
+    /// Dump mode - output parsed metrics as JSON Lines to stdout instead of sending to server
+    #[structopt(long)]
+    dump: bool,
+
+    /// Filter output to a specific metric name (only works with --dump)
+    #[structopt(long)]
+    metric: Option<String>,
 }
 
 /// Run the check mode to analyze FTDC file contents without sending to Victoria Metrics
@@ -99,6 +108,51 @@ async fn run_check_mode(reader: &mut FtdcReader) -> Result<()> {
 
     for (i, name) in sorted_metrics.iter().enumerate() {
         println!("{}. {}", i + 1, name);
+    }
+
+    Ok(())
+}
+
+/// Run dump mode to output parsed metrics as JSON Lines to stdout
+async fn run_dump_mode(reader: &mut FtdcReader, metric_filter: Option<&str>) -> Result<()> {
+    let stdout = std::io::stdout();
+    let mut handle = stdout.lock();
+
+    // Process all documents using time series format
+    while let Some(doc) = reader
+        .read_next_time_series()
+        .await
+        .context("Failed to read FTDC document in time series format")?
+    {
+        // Each metric gets its own set of data points
+        for metric in &doc.metrics {
+            // Apply metric filter if specified
+            if let Some(filter) = metric_filter {
+                if metric.name != filter {
+                    continue;
+                }
+            }
+
+            // For each timestamp, create a JSON object
+            for (i, (&value, timestamp)) in metric.values.iter().zip(&doc.timestamps).enumerate() {
+                // Convert SystemTime to Unix timestamp (milliseconds)
+                let timestamp_ms = timestamp
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_millis() as i64)
+                    .unwrap_or(0);
+
+                // Create a JSON object for this data point
+                let json_line = serde_json::json!({
+                    "metric": metric.name,
+                    "timestamp": timestamp_ms,
+                    "value": value,
+                    "sample_index": i,
+                });
+
+                // Write as JSON Lines (one JSON object per line)
+                writeln!(handle, "{}", json_line)?;
+            }
+        }
     }
 
     Ok(())
@@ -173,6 +227,11 @@ async fn main() -> Result<()> {
     if opt.check {
         // Run in check mode without sending metrics
         return run_check_mode(&mut reader).await;
+    }
+
+    if opt.dump {
+        // Run in dump mode to output metrics as JSON Lines to stdout
+        return run_dump_mode(&mut reader, opt.metric.as_deref()).await;
     }
 
     // Clean up old metrics only if clean flag is specified
