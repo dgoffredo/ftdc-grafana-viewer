@@ -1,0 +1,21 @@
+# Used in CPU% calculations:
+systemMetrics_cpu_user_ms
+systemMetrics_cpu_nice_ms
+systemMetrics_cpu_system_ms
+systemMetrics_cpu_idle_ms
+systemMetrics_cpu_iowait_ms
+systemMetrics_cpu_irq_ms
+systemMetrics_cpu_softirq_ms
+systemMetrics_cpu_steal_ms
+systemMetrics_cpu_guest_ms
+systemMetrics_cpu_guest_nice_ms
+
+# Not used in CPU% calculations:
+# systemMetrics_cpu_btime
+# systemMetrics_cpu_ctxt
+# systemMetrics_cpu_num_cores_available_to_process
+# systemMetrics_cpu_num_logical_cores
+# systemMetrics_cpu_processes
+# systemMetrics_cpu_procs_blocked
+# systemMetrics_cpu_procs_running
+

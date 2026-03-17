@@ -1,0 +1,53 @@
+#!/usr/bin/env python
+
+
+import bisect
+import json
+import sys
+
+
+def find_closest(needle, haystack, key):
+    pos = bisect.bisect_left(haystack, needle, key=key)
+    if pos == 0:
+        return haystack[0]
+    if pos == len(haystack):
+        return haystack[-1]
+    before = haystack[pos - 1]
+    after = haystack[pos]
+    if key(after) - needle < needle - key(before):
+        return after
+    else:
+        return before
+
+
+def read_jsonl_sorted(path, key):
+    records = []
+    with open(path) as file:
+        for line in file:
+            if not line.strip():
+                continue
+            records.append(json.loads(line))
+    records.sort(key=key)
+    return records
+
+
+if __name__ == '__main__':
+    assert len(sys.argv) > 2, 'specify one or more jsonl file paths to merge together'
+
+    # Convert the file paths into lists of parsed JSON records, one list for each file.
+    root, *rest = sys.argv[1:]
+    key = lambda x: x['timestamp']
+    root = read_jsonl_sorted(root, key)
+    for i in range(len(rest)):
+        rest[i] = read_jsonl_sorted(rest[i], key)
+
+    for left in root:
+        timestamp = key(left)
+        joined = {'timestamp': timestamp, left['metric']: left}
+        for right in rest:
+            closest = find_closest(timestamp, right, key)
+            assert closest['metric'] not in joined, f'Duplicate metric {closest["metric"]}'
+            joined[closest['metric']] = closest
+        json.dump(joined, sys.stdout)
+        sys.stdout.write('\n')
+

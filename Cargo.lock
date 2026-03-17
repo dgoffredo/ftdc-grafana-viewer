@@ -639,6 +639,7 @@ dependencies = [
  "criterion",
  "flate2",
  "futures",
+ "libc",
  "libflate",
  "prometheus-reqwest-remote-write",
  "reqwest",

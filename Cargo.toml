@@ -6,6 +6,7 @@ authors = ["Siyuan Zhou <siyuan.zhou@mongodb.com>"]
 description = "MongoDB FTDC to Victoria Metrics importer"
 
 [dependencies]
+libc = "0.2"
 libflate = "2.0"
 byteorder = "1.5"
 bson = "2.9.0"

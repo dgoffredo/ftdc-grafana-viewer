@@ -2,7 +2,7 @@
 
 usage() {
     cat <<'END_USAGE'
-usage: ./extract <FTDC_symlink_directory> [<metric_name>]
+usage: extract <FTDC_symlink_directory> [<metric_name>]
 
 Parse the FTDC dump files from the specified <FTDC_symlink_directory> of
 symbolic links, and append JSON-lines to files in the current directory, where
@@ -32,21 +32,36 @@ output_for() {
 
 # Clean up any existing output files.
 for input in "$ftdc_dir"/*; do
+    {
     output=$(output_for "$input")
     rm -f "$output"
+    } &
 done
+wait
 
 # Append to the output files.
 for input in "$ftdc_dir"/*; do
+    {
     output=$(output_for "$input")
     "$importer" --dump --metric "$metric" "$input" >>"$output"
+    } &
 done
+wait
 
 # Sort the output files by timestamp (polite, though not strictly necessary).
 scratch=$(mktemp -d)
 for input in "$ftdc_dir"/*; do
-    output=$(output_for "$input")
-    <"$output" jq -c --slurp 'sort_by(.timestamp) | .[]' >"$scratch/sorted" && mv "$scratch/sorted" "$output"
+    echo "$(output_for "$input")" >>"$scratch/outputs"
 done
+sort "$scratch/outputs" | uniq >"$scratch/unique-outputs"
+while read -r output; do
+    {
+    <"$output" jq -c --slurp 'sort_by(.timestamp) | .[]' >"$scratch/$output.sorted" && mv "$scratch/$output.sorted" "$output"
+    } &
+done <"$scratch/unique-outputs"
+wait
+
+cat "$scratch/unique-outputs"
+
 rm -r "$scratch"
 

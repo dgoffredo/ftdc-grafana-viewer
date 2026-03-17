@@ -1,0 +1,65 @@
+#!/usr/bin/env python
+
+import fileinput
+import json
+import sys
+
+
+# Instead of
+#
+#     foo['systemMetrics_cpu_idle_ms']['value']
+#
+# do
+#
+#     wrap = MetricWrapper(foo)
+#     wrap.idle
+#
+class MetricWrapper:
+    def __init__(self, obj):
+        self._obj = obj
+
+    def __getattr__(self, attr):
+        return self._obj[f'systemMetrics_cpu_{attr}_ms']['value']
+
+
+previous = None
+for line in fileinput.input(encoding="utf-8"):
+    current = json.loads(line)
+    if previous is None:
+        previous = current
+        continue
+
+    prev = MetricWrapper(previous)
+    curr = MetricWrapper(current)
+
+    δuser = curr.user - prev.user
+    δnice = curr.nice - prev.nice
+    δsystem = curr.system - prev.system
+    δidle = curr.idle - prev.idle
+    δiowait = curr.iowait - prev.iowait
+    δirq = curr.irq - prev.irq
+    δsoftirq = curr.softirq - prev.softirq
+    δsteal = curr.steal - prev.steal
+    δguest = curr.guest - prev.guest
+    δguest_nice = curr.guest_nice - prev.guest_nice
+
+    total_active = δuser + δnice + δsystem + δirq + δsoftirq + δsteal + δguest + δguest_nice
+    total_idle = δidle + δiowait
+    total_steal = δsteal
+
+    if total_active + total_idle != 0:
+        active_percent = (total_active / (total_active + total_idle)) * 100
+        idle_percent = (total_idle / (total_active + total_idle)) * 100
+        steal_percent = (total_steal / (total_active + total_idle)) * 100
+
+        timestamp_ms = current['timestamp']
+        json.dump({
+            'timestamp_unix': timestamp_ms / 1000,
+            'CPU Active%': round(active_percent, 2),
+            'CPU Idle%': round(idle_percent, 2),
+            'CPU Steal%': round(steal_percent, 2)
+        }, sys.stdout)
+        sys.stdout.write('\n')
+
+    previous = current
+

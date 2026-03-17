@@ -1,0 +1,4 @@
+#!/bin/sh
+
+jq --raw-output '"\(.timestamp_unix) \(.rate_per_second)"'
+

@@ -3,6 +3,7 @@ use ftdc_importer::{
     prometheus::PrometheusRemoteWriteClient, reader::FtdcReader,
     victoria_metrics::VictoriaMetricsClient, ImportMetadata,
 };
+use libc;
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::PathBuf;
@@ -187,6 +188,11 @@ async fn run_import_mode_prometheus(
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Handle SIGPIPE (write() to closed file) by terminating the process quietly.
+    unsafe {  
+        libc::signal(libc::SIGPIPE, libc::SIG_DFL);  
+    }
+
     let opt = Opt::from_args();
 
     if opt.verbose {

@@ -1,0 +1,15 @@
+#!/bin/sh
+
+# TODO: usage instructions
+
+ftdc_symlink_directory=$1
+
+extract-cpu "$ftdc_symlink_directory" | xargs join-cpu | while read -r jsonl; do
+    {
+    output="${jsonl%.jsonl}%.tab"
+    compute-cpu "$jsonl" | jsonl2tab >"$output"
+    # echo "$output"
+    } &
+done
+wait
+

@@ -1,0 +1,35 @@
+#!/bin/sh
+
+usage() {
+    cat <<'END_USAGE'
+usage: join-cpu <CPU_JSONL_FILE> ...
+
+Group the specified CPU-metrics-containing jsonl files by
+(instance size, mongod instance), and join all metrics into
+a new jsonl file in the current directory.
+END_USAGE
+}
+
+if [ $# -lt 1 ]; then
+    >&2 usage
+    exit 1
+fi
+
+if [ "$1" = '--help' ] || [ "$1" = '-h' ]; then
+    usage
+    exit 0
+fi
+
+as_lines() {
+    echo "$@" | tr ' ' '\n'
+}
+
+# For each distinct "*shard-00-YY", join its files into one .jsonl file.
+as_lines "$@" | sed 's/^\(.*shard-[^.]\+\)\..*/\1/' | sort | uniq | while read -r shard; do
+    {
+    as_lines "$@" | grep "^$shard" | xargs join-by-closest-timestamp >"$shard.CPU.jsonl"
+    echo "$shard.CPU.jsonl"
+    } &
+done
+wait
+

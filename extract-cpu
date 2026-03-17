@@ -1,0 +1,39 @@
+#!/bin/sh
+
+usage() {
+    cat << 'END_USAGE'
+usage: extract-cpu <FTDC_symlink_directory>
+
+For each system-wide CPU related metric, parse the FTDC dump files from the
+specified <FTDC_symlink_directory> of symbolic links, and append JSON-lines to
+files in the current directory, where the names of the new files are derived
+from the names of the symbolic links.
+END_USAGE
+}
+
+if [ $# -ne 1 ]; then
+    >&2 usage
+    exit 1
+fi
+if [ "$1" = '--help' ] || [ "$1" = '-h' ]; then
+    usage
+    exit 0
+fi
+
+while read -r metric; do
+    extract "$1" "$metric" &
+done <<'END_METRICS'
+systemMetrics_cpu_user_ms
+systemMetrics_cpu_nice_ms
+systemMetrics_cpu_system_ms
+systemMetrics_cpu_idle_ms
+systemMetrics_cpu_iowait_ms
+systemMetrics_cpu_irq_ms
+systemMetrics_cpu_softirq_ms
+systemMetrics_cpu_steal_ms
+systemMetrics_cpu_guest_ms
+systemMetrics_cpu_guest_nice_ms
+END_METRICS
+
+wait
+
